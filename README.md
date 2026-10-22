@@ -3,8 +3,9 @@
 Cargo is a community build plugin for Lithe. It uses Lithe's native Cargo
 tool window and Build Output to build, check, test, clean, and run Rust projects.
 
-**0.1.0 is a preview release.** Automated macOS integration and Core contract
-checks pass; native disk-installation and full UI acceptance are still pending.
+**0.1.0 is a preview release.** Native disk-installation and full UI acceptance
+are still pending. Automated integration and host compatibility run in this
+repository's CI.
 The plugin requires a Lithe preview with API 3 `buildSystems: 1`,
 `buildProviders: 1` and `serverProcess: 1`. Windows is not supported yet.
 
@@ -42,15 +43,44 @@ members or target sources outside the selected build root are refused. The host'
 
 ## Develop and verify
 
-Requires Node 20.3+, `zip`, and Cargo for integration tests. No npm installation,
-network service or adjacent Lithe checkout is needed:
+Requires Node 20.3+, `zip`, and Cargo for integration tests. Unit tests and
+packaging need no npm installation, network service or adjacent Lithe checkout:
 
 ```sh
 node scripts/verify-sdk.mjs
-node --test test/*.test.mjs
-LITHE_CARGO_INTEGRATION=1 node --test test/*.test.mjs
+node scripts/test.mjs
 node scripts/package.mjs
 ```
+
+Full integration also compiles a test-only bridge to Lithe's public
+`execute_json` API. CI checks out the exact host repository/revision from
+`sdk.lock.json` into `.artifacts/lithe-core`; it never follows a moving branch.
+For the same local procedure, clone the pinned host once (network required):
+
+```sh
+gh repo clone 1lck/Lithe-IDEA .artifacts/lithe-core -- --filter=blob:none --no-checkout
+git -C .artifacts/lithe-core sparse-checkout set rust shared
+git -C .artifacts/lithe-core checkout --detach "$(node -p 'require("./sdk.lock.json").source.revision')"
+node scripts/prepare-core.mjs
+LITHE_CARGO_INTEGRATION=1 node scripts/test.mjs
+```
+
+Cargo downloads the host's locked Rust dependencies on the first build; only
+the tiny Cargo fixture runs offline. Preparation rejects a different revision,
+origin or tracked modifications, builds with `--locked`, and records bridge
+and binary hashes. `.artifacts/core-target` is private mutable build state for
+this checkout; it is not a shared worktree cache and never enters the plugin ZIP.
+The copied example in the disposable host checkout contains only the public API
+call; Cargo-specific assertions, manifests and golden models remain here.
+
+The three Core compatibility tests cover install review and capability refusal,
+outermost workspace detection/model decoding, and task/test argument selection.
+The packaged-provider test passes the real reply through Core and executes
+Core-generated build/check/test/run/clean plans, including diagnostic decoding.
+It does not substitute hand-written Cargo commands for the host plans.
+HTML, per-test timing, JUnit and logs are written to `.artifacts/test-stability/`
+and uploaded by CI. Default unit runs explicitly skip host/Cargo integration;
+both CI and release verification enable it.
 
 The archive and its SHA-256 sidecar are written to `dist/`; the unpacked package
 is `dist/io.github.lithe-idea.cargo-build/`. The archive serves both Apple Silicon
@@ -61,8 +91,10 @@ The zero-dependency Node SDK and test helpers are vendored at the exact source
 revision in `sdk.lock.json`. Packaging refuses changed/unpinned vendor files and
 symbolic links. To update the SDK, copy the upstream files and deliberately
 update the source revision and every SHA-256; do not download anything at runtime.
-The main Lithe repository keeps a pinned Cargo manifest/model fixture for Core
-compatibility tests, matching this repository's integration golden model.
+The main Lithe repository retains generic plugin contract tests. This repository
+owns Cargo-specific compatibility tests and uses the same host pin as the SDK;
+updating that pin deliberately tests a new supported host baseline. A fixed
+baseline does not by itself detect regressions on future Lithe preview commits.
 
 ## Runtime and build ownership
 
@@ -74,7 +106,8 @@ the package's complete file listing and SHA-256 hashes before and after use.
 
 Cargo's user cache, Cargo.lock and target directory remain owned by Cargo and
 the user's project configuration. This plugin creates no extra runtime cache.
-`dist/`, packaging staging and `.artifacts/` test reports belong to one checkout
+`dist/`, packaging staging, the pinned host checkout, Core compilation and
+`.artifacts/` test reports belong to one checkout
 and must not be copied as shared build caches. Packaging removes its own staging
 on success/failure; developers own final artifact cleanup. No installation step
 runs in the read-only plugin package.

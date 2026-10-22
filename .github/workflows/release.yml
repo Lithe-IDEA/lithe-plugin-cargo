@@ -15,7 +15,7 @@ env:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,12 +23,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Read pinned host revision
+        id: core
+        if: hashFiles('scripts/prepare-core.mjs') != ''
+        run: node -e 'const s=require("./sdk.lock.json").source; console.log(`repository=${new URL(s.repository).pathname.slice(1)}\nrevision=${s.revision}`)' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.core.outputs.revision != ''
+        with:
+          repository: ${{ steps.core.outputs.repository }}
+          ref: ${{ steps.core.outputs.revision }}
+          path: .artifacts/lithe-core
+          sparse-checkout: |
+            rust
+            shared
+          persist-credentials: false
+      - name: Build test-only bridge to the pinned Core
+        if: steps.core.outputs.revision != ''
+        run: node scripts/prepare-core.mjs
       - name: Verify, test and package
         env:
           LITHE_CARGO_INTEGRATION: '1'
         run: |
           node scripts/verify-sdk.mjs
-          node --test test/*.test.mjs
+          if [ -f scripts/test.mjs ]; then
+            node scripts/test.mjs
+          else
+            # Historical tags retain their own test procedure.
+            node --test test/*.test.mjs
+          fi
           node scripts/package.mjs --expect-tag "$RELEASE_TAG"
       - name: Publish immutable preview assets
         env:
@@ -52,3 +74,11 @@ jobs:
           Preview status: automated integration and contract checks pass; native installation and full UI acceptance are pending. Windows is not supported. Published ZIP bytes must not be replaced.
           NOTES
           gh release create "$RELEASE_TAG" dist/*.zip dist/*.sha256 --verify-tag --prerelease --title "Cargo $RELEASE_TAG" --notes-file "$RUNNER_TEMP/notes.md"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-tests
+          path: |
+            .artifacts/test-stability/
+            .artifacts/core-target/build.log
+          retention-days: 7

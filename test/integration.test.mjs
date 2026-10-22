@@ -10,6 +10,7 @@ import { buildPackage } from '../scripts/package.mjs';
 import { TestHost } from '../vendor/lithe-plugin-sdk/test/harness.mjs';
 import { runProcess } from '../vendor/lithe-plugin-sdk/src/index.mjs';
 import { terminateProcessTree } from '../vendor/lithe-testing/test-timing-lib.mjs';
+import { build, integrationSkip } from './support/core.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 async function snapshot(root) {
@@ -27,7 +28,7 @@ async function snapshot(root) {
 
 test('packaged provider loads a real Cargo workspace; build/test/run/clean leave its package unchanged', {
   timeout: 90000,
-  skip: process.env.LITHE_CARGO_INTEGRATION !== '1' ? 'Set LITHE_CARGO_INTEGRATION=1 to run with installed Rust/Cargo.' : false
+  skip: integrationSkip
 }, async (t) => {
   const scratch = await mkdtemp(join(tmpdir(), 'lithe-cargo-integration-'));
   t.after(() => rm(scratch, { recursive: true, force: true }));
@@ -46,31 +47,50 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   });
   const initialized = await host.initialize({ litheBuild: { versions: [1] } }, pathToFileURL(root).href + '/');
   assert.equal(initialized.result.capabilities.experimental.litheBuild.version, 1);
-  const loaded = await host.request('lithe/build/model', { buildSystemID: 'cargo', root: '.', options: { offline: true } });
+  const modelPlan = await build('build.modelPlan', { root: '.', options: { offline: true } });
+  const loaded = await host.request(modelPlan.plan.provider.method, modelPlan.plan.provider.params);
   assert.equal(loaded.error, undefined, JSON.stringify(loaded.error));
   assert.deepEqual(loaded.result, { format: 'litheBuildModel', version: 1, ...JSON.parse(await readFile(join(here, 'fixtures/model.json'))) });
-  const cargo = async (args) => runProcess('cargo', ['--color', 'never', ...args], {
-    cwd: root, env: { ...process.env, CARGO_TARGET_DIR: join(scratch, 'target') },
-    signal: AbortSignal.timeout(20000), maxOutputBytes: 1024 * 1024
-  });
-  for (const command of ['check', 'build', 'test']) {
-    const result = await cargo([command, '--workspace', '--offline', '--release', '--features', 'cargo-plugin-demo/greeting']);
+  const { model } = await build('build.decodeModel', { workspaceRoot: root, root: '.', result: loaded.result });
+  const project = model.projects.find((item) => item.name === 'cargo-plugin-demo');
+  assert.ok(project);
+  const options = { offline: true, release: true, features: model.optionValues.features };
+  // Execute the host's plans, so a broken manifest cannot pass by using
+  // separately hand-written Cargo command lines in this integration test.
+  const cargo = async (command, request) => {
+    const { plan } = await build(command, { root: '.', options, ...request });
+    return runProcess('cargo', plan.arguments, {
+      cwd: join(root, plan.workingDirectory), env: { ...process.env, ...plan.environment, CARGO_TARGET_DIR: join(scratch, 'target') },
+      signal: AbortSignal.timeout(20000), maxOutputBytes: 1024 * 1024
+    });
+  };
+  for (const task of ['check', 'build']) {
+    const result = await cargo('build.taskPlan', { task });
     assert.equal(result.exitCode, 0, result.stderr);
   }
-  const binary = await cargo(['run', '--offline', '--package', 'cargo-plugin-demo', '--bin', 'demo']);
+  const allTests = await cargo('build.testPlan', {});
+  assert.equal(allTests.exitCode, 0, allTests.stderr);
+  const target = (tag) => {
+    const selected = model.targets.find((item) => item.tags.includes(tag) && item.name === (tag === 'test' ? 'smoke' : 'demo'));
+    assert.ok(selected, `missing ${tag} target`);
+    return selected;
+  };
+  const binary = await cargo('build.taskPlan', { task: 'run-binary', project, target: target('application') });
   assert.equal(binary.exitCode, 0, binary.stderr);
   assert.equal(binary.stdout.trim(), 'cargo plugin');
-  const example = await cargo(['run', '--offline', '--package', 'cargo-plugin-demo', '--example', 'demo']);
+  const example = await cargo('build.taskPlan', { task: 'run-example', project, target: target('example') });
   assert.equal(example.exitCode, 0, example.stderr);
   assert.equal(example.stdout.trim(), 'example');
-  const selected = await cargo(['test', '--offline', '--package', 'cargo-plugin-demo', '--test', 'smoke', '--', 'greeting_is_available', '--exact']);
+  const selected = await cargo('build.testPlan', { project, target: target('test'), case: 'greeting_is_available' });
   assert.equal(selected.exitCode, 0, selected.stderr);
   assert.match(selected.stdout, /1 passed/);
   await writeFile(join(root, 'app/src/main.rs'), 'fn main() { let value: u8 = "wrong"; }');
-  const invalid = await cargo(['check', '--offline', '--package', 'cargo-plugin-demo', '--message-format=short']);
+  const invalid = await cargo('build.taskPlan', { task: 'check', project });
   assert.notEqual(invalid.exitCode, 0);
   assert.match(invalid.stderr, /app\/src\/main.rs:\d+:\d+: error/);
-  assert.equal((await cargo(['clean'])).exitCode, 0);
+  const diagnostics = await build('build.decodeDiagnostics', { workspaceRoot: root, root: '.', output: invalid.stderr });
+  assert.ok(diagnostics.diagnostics.some((item) => item.path === 'app/src/main.rs' && item.severity === 'error'));
+  assert.equal((await cargo('build.taskPlan', { task: 'clean' })).exitCode, 0);
   assert.equal((await host.request('shutdown', null)).error, undefined);
   host.notify('exit', null);
   assert.equal(await host.close(), 0);

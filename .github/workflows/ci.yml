@@ -8,19 +8,33 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Read pinned host revision
+        id: core
+        run: node -e 'const s=require("./sdk.lock.json").source; console.log(`repository=${new URL(s.repository).pathname.slice(1)}\nrevision=${s.revision}`)' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.core.outputs.repository }}
+          ref: ${{ steps.core.outputs.revision }}
+          path: .artifacts/lithe-core
+          sparse-checkout: |
+            rust
+            shared
+          persist-credentials: false
+      - name: Build test-only bridge to the pinned Core
+        run: node scripts/prepare-core.mjs
       - name: Verify SDK and run offline integration
         env:
           LITHE_CARGO_INTEGRATION: '1'
         run: |
           mkdir -p .artifacts
           node scripts/verify-sdk.mjs
-          node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=.artifacts/tests.xml test/*.test.mjs
+          node scripts/test.mjs
       - name: Assemble package
         run: node scripts/package.mjs
       - uses: actions/upload-artifact@v4
@@ -28,7 +42,8 @@ jobs:
         with:
           name: cargo-plugin
           path: |
-            .artifacts/tests.xml
+            .artifacts/test-stability/
+            .artifacts/core-target/build.log
             dist/*.zip
             dist/*.sha256
           retention-days: 7

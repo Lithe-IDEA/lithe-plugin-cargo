@@ -59,6 +59,11 @@
       "upstream": ".agents/skills/write-stable-tests/scripts/test-timing-lib.mjs",
       "path": "vendor/lithe-testing/test-timing-lib.mjs",
       "sha256": "6475279234c07cb8d420e03dbfc5e87aa64fd1703c872798684ee56cd2bc3425"
+    },
+    {
+      "upstream": ".agents/skills/write-stable-tests/scripts/generate-test-report.mjs",
+      "path": "vendor/lithe-testing/generate-test-report.mjs",
+      "sha256": "ef4170b6380077d48dcf11a54faa423c2071291b2202a7f89df86d4b93853824"
     }
   ]
 }
