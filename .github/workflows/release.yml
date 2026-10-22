@@ -2,14 +2,24 @@ name: Release preview
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to verify or publish
+        required: true
+        type: string
 permissions:
   contents: write
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -19,11 +29,21 @@ jobs:
         run: |
           node scripts/verify-sdk.mjs
           node --test test/*.test.mjs
-          node scripts/package.mjs --expect-tag "$GITHUB_REF_NAME"
+          node scripts/package.mjs --expect-tag "$RELEASE_TAG"
       - name: Publish immutable preview assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A maintainer may have uploaded an immutable release before this
+          # tag run starts. Verify the published bytes without replacing them.
+          if gh release view "$RELEASE_TAG" --json url > "$RUNNER_TEMP/existing-release.json"; then
+            archive="cargo-build-${RELEASE_TAG#v}-darwin.zip"
+            mkdir -p "$RUNNER_TEMP/published"
+            gh release download "$RELEASE_TAG" --pattern "$archive" --pattern "$archive.sha256" --dir "$RUNNER_TEMP/published"
+            (cd "$RUNNER_TEMP/published" && sha256sum --check "$archive.sha256")
+            echo "Existing release verified; its assets remain unchanged."
+            exit 0
+          fi
           cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
           macOS Cargo integration for a Lithe preview with API 3 buildSystems, buildProviders and serverProcess support.
 
@@ -31,4 +51,4 @@ jobs:
 
           Preview status: automated integration and contract checks pass; native installation and full UI acceptance are pending. Windows is not supported. Published ZIP bytes must not be replaced.
           NOTES
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 --verify-tag --prerelease --title "Cargo $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release create "$RELEASE_TAG" dist/*.zip dist/*.sha256 --verify-tag --prerelease --title "Cargo $RELEASE_TAG" --notes-file "$RUNNER_TEMP/notes.md"
