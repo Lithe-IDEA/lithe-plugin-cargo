@@ -70,9 +70,11 @@ export function registerCargoProvider(backend, PluginError) {
     }
     const args = ['metadata', '--format-version', '1', '--no-deps', '--manifest-path', resolve(directory, 'Cargo.toml')];
     if (options.offline === true) args.push('--offline');
+    const processEnvironment = { ...process.env, ...environment };
+    if (tool) processEnvironment.PATH = `${dirname(executable)}:${processEnvironment.PATH ?? ''}`;
     let result;
     try {
-      result = await context.run(executable, args, { cwd: directory, env: { ...process.env, ...environment }, maxOutputBytes: 8 * 1024 * 1024 });
+      result = await context.run(executable, args, { cwd: directory, env: processEnvironment, maxOutputBytes: 8 * 1024 * 1024 });
     } catch (error) {
       context.throwIfCancelled();
       context.log(error);

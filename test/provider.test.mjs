@@ -55,6 +55,7 @@ test('initialization is passive; metadata uses the host tool and only supported 
   assert.equal(calls[0][0], '/fake-tools/cargo');
   assert.deepEqual(calls[0][1], ['metadata', '--format-version', '1', '--no-deps', '--manifest-path', join(root, 'Cargo.toml'), '--offline']);
   assert.equal(calls[0][2].cwd, root);
+  assert.ok(calls[0][2].env.PATH.startsWith('/fake-tools:'));
 });
 
 test('relative and symlink build-root escapes are refused before Cargo starts', { timeout: 5000 }, async (t) => {
