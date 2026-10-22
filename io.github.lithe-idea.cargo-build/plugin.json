@@ -2,18 +2,26 @@
   "schemaVersion": 2,
   "id": "io.github.lithe-idea.cargo-build",
   "displayName": "Cargo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "pluginAPIVersion": 3,
-  "requires": { "buildProviders": 1, "buildSystems": 1, "serverProcess": 1 },
+  "requires": { "buildProviders": 1, "buildSystems": 2, "serverProcess": 1, "settings": 2 },
   "vendor": { "id": "io.github.lithe-idea", "displayName": "Lithe Community", "signatureRequirement": "none" },
   "permissions": ["languageServer.launch", "process.build"],
   "activationEvents": ["onBuildSystem:cargo"],
   "languages": [],
+  "settings": [{
+    "id": "cargoPath", "type": "file", "title": "Cargo 路径",
+    "description": "选择 Cargo 可执行文件的绝对路径。留空自动查找；保存后重新加载项目模型，后续构建、测试和运行使用此路径。请勿选择 rustc 或 rustup。",
+    "default": "", "scope": "global", "effect": "reload",
+    "page": { "buildSystemID": "cargo" }, "section": "工具链",
+    "placeholder": "自动查找 Cargo"
+  }],
   "buildSystems": [{
     "id": "cargo",
     "displayName": "Cargo",
     "detection": { "markers": ["Cargo.toml"], "nesting": "outermost" },
     "invocation": {
+      "executableSetting": "cargoPath",
       "executables": [{ "kind": "command", "command": "cargo" }],
       "globalArguments": ["--color", "never"],
       "version": { "arguments": ["--version"], "pattern": "cargo (\\d+\\.\\d+\\.\\d+)" },

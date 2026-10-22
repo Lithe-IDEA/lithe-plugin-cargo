@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cp, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -35,6 +35,21 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   const workspace = join(scratch, 'workspace');
   await cp(join(here, 'fixtures/workspace'), workspace, { recursive: true });
   const root = await realpath(workspace);
+  // A path with spaces and a different executable name catches shell splitting
+  // and accidental fallback to `cargo` on PATH. Record metadata and every task.
+  const toolDirectory = join(scratch, 'custom tools');
+  await mkdir(toolDirectory);
+  const tool = join(await realpath(toolDirectory), 'selected-cargo');
+  const calls = join(scratch, 'cargo-calls');
+  const discovered = await runProcess('which', ['cargo'], { signal: AbortSignal.timeout(5000) });
+  assert.equal(discovered.exitCode, 0, discovered.stderr);
+  const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+  await writeFile(tool, `#!/bin/sh\nprintf '%s\\n' "$1" >> ${quote(calls)}\nexec ${quote(discovered.stdout.trim())} "$@"\n`, { mode: 0o755 });
+  const configured = await build('build.invocationPlan', { root: '.', platform: 'macos', settings: { cargoPath: tool } });
+  assert.equal(configured.invocation.configuredExecutable, tool);
+  const automatic = await build('build.invocationPlan', { root: '.', platform: 'macos', settings: { cargoPath: '' } });
+  assert.equal(automatic.invocation.configuredExecutable, undefined);
+  assert.deepEqual(automatic.invocation.executables, [{ kind: 'command', command: 'cargo' }]);
   const built = await buildPackage(join(scratch, 'packages'));
   const baseline = await snapshot(built.directory);
   const backend = spawn(process.execPath, [join(built.directory, 'backend/main.mjs')], {
@@ -47,7 +62,7 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   });
   const initialized = await host.initialize({ litheBuild: { versions: [1] } }, pathToFileURL(root).href + '/');
   assert.equal(initialized.result.capabilities.experimental.litheBuild.version, 1);
-  const modelPlan = await build('build.modelPlan', { root: '.', options: { offline: true } });
+  const modelPlan = await build('build.modelPlan', { root: '.', options: { offline: true }, tool: { executable: configured.invocation.configuredExecutable } });
   const loaded = await host.request(modelPlan.plan.provider.method, modelPlan.plan.provider.params);
   assert.equal(loaded.error, undefined, JSON.stringify(loaded.error));
   assert.deepEqual(loaded.result, { format: 'litheBuildModel', version: 1, ...JSON.parse(await readFile(join(here, 'fixtures/model.json'))) });
@@ -59,7 +74,7 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   // separately hand-written Cargo command lines in this integration test.
   const cargo = async (command, request) => {
     const { plan } = await build(command, { root: '.', options, ...request });
-    return runProcess('cargo', plan.arguments, {
+    return runProcess(configured.invocation.configuredExecutable, plan.arguments, {
       cwd: join(root, plan.workingDirectory), env: { ...process.env, ...plan.environment, CARGO_TARGET_DIR: join(scratch, 'target') },
       signal: AbortSignal.timeout(20000), maxOutputBytes: 1024 * 1024
     });
@@ -91,6 +106,9 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   const diagnostics = await build('build.decodeDiagnostics', { workspaceRoot: root, root: '.', output: invalid.stderr });
   assert.ok(diagnostics.diagnostics.some((item) => item.path === 'app/src/main.rs' && item.severity === 'error'));
   assert.equal((await cargo('build.taskPlan', { task: 'clean' })).exitCode, 0);
+  const commands = (await readFile(calls, 'utf8')).trim().split('\n');
+  for (const command of ['metadata', '--color']) assert.ok(commands.includes(command), `custom Cargo missed ${command}`);
+  assert.equal(commands.length, 9, 'metadata and all eight task/test plans must use the selected executable');
   assert.equal((await host.request('shutdown', null)).error, undefined);
   host.notify('exit', null);
   assert.equal(await host.close(), 0);

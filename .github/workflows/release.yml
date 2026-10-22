@@ -67,9 +67,9 @@ jobs:
             exit 0
           fi
           cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
-          macOS Cargo integration for a Lithe preview with API 3 buildSystems, buildProviders and serverProcess support.
+          macOS Cargo integration for a Lithe preview with API 3 buildSystems 2, settings 2, buildProviders 1 and serverProcess 1 support.
 
-          Requires Cargo 1.70+ and Node.js 20.3+. Includes workspace/package build, check and test, clean, binary/example runs, Release, Features and Offline options.
+          Adds a native Cargo executable path setting: select a file or leave it empty for discovery. Metadata, builds, tests, run and clean share the selected executable; an invalid selection fails instead of falling back. Requires Cargo 1.70+ and Node.js 20.3+. Existing workspace/package tasks and Release, Features and Offline options remain available.
 
           Preview status: automated integration and contract checks pass; native installation and full UI acceptance are pending. Windows is not supported. Published ZIP bytes must not be replaced.
           NOTES

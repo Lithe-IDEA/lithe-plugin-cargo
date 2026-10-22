@@ -3,10 +3,10 @@
 Cargo is a community build plugin for Lithe. It uses Lithe's native Cargo
 tool window and Build Output to build, check, test, clean, and run Rust projects.
 
-**0.1.0 is a preview release.** Native disk-installation and full UI acceptance
+**0.1.1 is a preview release.** Native disk-installation and full UI acceptance
 are still pending. Automated integration and host compatibility run in this
 repository's CI.
-The plugin requires a Lithe preview with API 3 `buildSystems: 1`,
+The plugin requires a Lithe preview with API 3 `buildSystems: 2`, `settings: 2`,
 `buildProviders: 1` and `serverProcess: 1`. Windows is not supported yet.
 
 ## Install
@@ -15,12 +15,27 @@ Install Rust/Cargo 1.70+ and Node.js 20.3+ first. Node runs the metadata provide
 Cargo and rust-analyzer are not bundled. Existing Rust language intelligence
 continues to use Lithe's Rust language service.
 
-Download `cargo-build-0.1.0-darwin.zip` from [Releases](https://github.com/Lithe-IDEA/lithe-plugin-cargo/releases).
+Download `cargo-build-0.1.1-darwin.zip` from [Releases](https://github.com/Lithe-IDEA/lithe-plugin-cargo/releases).
 In Lithe, choose Settings → Plugins → Install from Disk, select the ZIP,
 review Cargo/Node and its permissions, and restart. Enable Cargo, open the
 Cargo workspace root, then open the Cargo tool window and load the project model.
 After the [Lithe Store](https://github.com/Lithe-IDEA/Lithe-store) entry is merged,
 compatible preview builds can also install it from the plugin marketplace.
+
+## Cargo path
+
+Settings → Plugins → Cargo → Settings contains **Cargo 路径** with a native
+file picker. It also appears in Build, Execution, Deployment → Cargo. Leave it
+empty for automatic discovery, or select the Cargo executable (not rustc/rustup).
+Saving reloads the model; metadata, build, check, test, run and clean use that
+same executable. A missing, non-executable or too-old selection fails visibly
+instead of silently choosing a different Cargo installation. The executable's
+parent directory is placed first on PATH for companion tools.
+
+Version 0.1.1 requires a preview host with `buildSystems: 2` and `settings: 2`.
+Its exact tested host revision is recorded in `sdk.lock.json`; older hosts keep
+using the compatible 0.1.0 release through the Store. Existing published ZIPs
+are immutable and are never replaced.
 
 ## Features
 
