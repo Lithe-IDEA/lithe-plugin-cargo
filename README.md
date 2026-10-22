@@ -3,10 +3,10 @@
 Cargo is a community build plugin for Lithe. It uses Lithe's native Cargo
 tool window and Build Output to build, check, test, clean, and run Rust projects.
 
-**0.1.1 is a preview release.** Native disk-installation and full UI acceptance
+**0.1.2 is unreleased preview source.** Native disk-installation and full UI acceptance
 are still pending. Automated integration and host compatibility run in this
 repository's CI.
-The plugin requires a Lithe preview with API 3 `buildSystems: 2`, `settings: 2`,
+The plugin requires a Lithe preview with API 3 `buildSystems: 1`, `executableResolution: 1`, `settings: 2`,
 `buildProviders: 1` and `serverProcess: 1`. Windows is not supported yet.
 
 ## Install
@@ -15,7 +15,9 @@ Install Rust/Cargo 1.70+ and Node.js 20.3+ first. Node runs the metadata provide
 Cargo and rust-analyzer are not bundled. Existing Rust language intelligence
 continues to use Lithe's Rust language service.
 
-Download `cargo-build-0.1.1-darwin.zip` from [Releases](https://github.com/Lithe-IDEA/lithe-plugin-cargo/releases).
+For this branch, build `dist/cargo-build-0.1.2-darwin.zip` with `node scripts/package.mjs`.
+The published 0.1.1 preview remains available from [Releases](https://github.com/Lithe-IDEA/lithe-plugin-cargo/releases)
+and keeps its older host requirements.
 In Lithe, choose Settings → Plugins → Install from Disk, select the ZIP,
 review Cargo/Node and its permissions, and restart. Enable Cargo, open the
 Cargo workspace root, then open the Cargo tool window and load the project model.
@@ -32,7 +34,7 @@ same executable. A missing, non-executable or too-old selection fails visibly
 instead of silently choosing a different Cargo installation. The executable's
 parent directory is placed first on PATH for companion tools.
 
-Version 0.1.1 requires a preview host with `buildSystems: 2` and `settings: 2`.
+Version 0.1.2 requires a preview host with `buildSystems: 1`, `executableResolution: 1` and `settings: 2`.
 Its exact tested host revision is recorded in `sdk.lock.json`; older hosts keep
 using the compatible 0.1.0 release through the Store. Existing published ZIPs
 are immutable and are never replaced.
@@ -137,3 +139,9 @@ Published ZIP bytes are immutable: fixes require a new version.
 
 The Store index records the repository URL, API requirements, release URL and
 archive SHA-256. First inclusion and pre-releases use a reviewed Store pull request.
+
+The 0.1.2 source migrates custom Cargo selection to the shared ordered executable
+candidates. Published 0.1.0/0.1.1 preview archives remain immutable. A compatible
+host must advertise `executableResolution: 1`; the setting is a candidate ahead
+of automatic PATH discovery, with empty values skipped and explicit failures
+reported by the host. Maven/Gradle-style automatic candidates need no path setting.

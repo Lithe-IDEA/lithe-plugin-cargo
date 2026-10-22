@@ -7,12 +7,12 @@ import { build, core, integrationSkip, workspace } from './support/core.mjs';
 
 test('Core validates the distributable manifest and requires a provider-capable host', { timeout: 15000, skip: integrationSkip }, async () => {
   const manifest = JSON.parse(await readFile(join(repository, 'io.github.lithe-idea.cargo-build/plugin.json'), 'utf8'));
-  const hostCapabilities = { buildSystems: [1, 2], buildProviders: [1], serverProcess: [1], settings: [1, 2] };
+  const hostCapabilities = { buildSystems: [1, 2], buildProviders: [1], serverProcess: [1], settings: [1, 2], executableResolution: [1] };
   assert.equal((await core('plugins.declarative.validate', { manifest, hostCapabilities })).status, 'ok');
   const review = await core('plugins.marketplace.installReview', { manifest, hostCapabilities });
   assert.equal(review.status, 'ok');
   for (const kind of ['runtimeBuildProvider', 'buildSystem']) assert.ok(review.review.programs.some((item) => item.kind === kind));
-  const oldHost = await core('plugins.declarative.validate', { manifest, hostCapabilities: { ...hostCapabilities, buildSystems: [1] } });
+  const oldHost = await core('plugins.declarative.validate', { manifest, hostCapabilities: { ...hostCapabilities, executableResolution: [] } });
   assert.equal(oldHost.error.code, 'plugin.api.unsupported');
   const unsupported = await core('plugins.declarative.validate', { manifest, hostCapabilities: { buildSystems: [1], serverProcess: [1] } });
   assert.equal(unsupported.error.code, 'plugin.api.unsupported');
