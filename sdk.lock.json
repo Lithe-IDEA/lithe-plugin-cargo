@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "https://github.com/1lck/Lithe-IDEA",
+    "revision": "d8174307f9b5d970783ca785ae3fc62bd3762941"
+  },
+  "files": [
+    {
+      "upstream": "LICENSE",
+      "path": "vendor/LICENSE",
+      "sha256": "93ff573f89d32394501fcc82767e73b1824add861f088bbd3eec9e0afae20d21"
+    },
+    {
+      "upstream": "sdk/node/src/backend.mjs",
+      "path": "vendor/lithe-plugin-sdk/src/backend.mjs",
+      "sha256": "7cf6e07d65ad91b30532fd31f0b83120b9dbadc71ecb05cbbe0c641d0e24bac5"
+    },
+    {
+      "upstream": "sdk/node/src/errors.mjs",
+      "path": "vendor/lithe-plugin-sdk/src/errors.mjs",
+      "sha256": "92190d518602beb944305c2b15011d7abca0d44058fd92afe0663f6ea05d749b"
+    },
+    {
+      "upstream": "sdk/node/src/framing.mjs",
+      "path": "vendor/lithe-plugin-sdk/src/framing.mjs",
+      "sha256": "ec745be1ecf4cf24d521c5aa3108da2bbbfb9156f2197fcb5158de1f1bc9cfd1"
+    },
+    {
+      "upstream": "sdk/node/src/index.d.ts",
+      "path": "vendor/lithe-plugin-sdk/src/index.d.ts",
+      "sha256": "7625a5d8f8234333a5e716282a6c25c28ef5108e650e6e165312e3a5b6c1b0ba"
+    },
+    {
+      "upstream": "sdk/node/src/index.mjs",
+      "path": "vendor/lithe-plugin-sdk/src/index.mjs",
+      "sha256": "8e29eb6d1125505b66f41f3f9e230cf3a398e75d5943e6bac9a889acd7bc307a"
+    },
+    {
+      "upstream": "sdk/node/src/process.mjs",
+      "path": "vendor/lithe-plugin-sdk/src/process.mjs",
+      "sha256": "a72f78cbfbb8d98b2d44ebea7f869038a3e34ebe7ee000f63cdd36fb2aaece66"
+    },
+    {
+      "upstream": "sdk/node/src/protocol.mjs",
+      "path": "vendor/lithe-plugin-sdk/src/protocol.mjs",
+      "sha256": "2d62f1eb7addf7b796d1b740f0964d5800d844877fbf59e3e4d79278b9023263"
+    },
+    {
+      "upstream": "sdk/node/src/state.mjs",
+      "path": "vendor/lithe-plugin-sdk/src/state.mjs",
+      "sha256": "946618214fbcb736c76ee85c87e0b969fe853fbab215f7c192990f2edf2035a4"
+    },
+    {
+      "upstream": "sdk/node/test/harness.mjs",
+      "path": "vendor/lithe-plugin-sdk/test/harness.mjs",
+      "sha256": "ae636e3236c40b9bb957748fbf7622914a87d5c6aaf5a358ea80b2d4628af53c"
+    },
+    {
+      "upstream": ".agents/skills/write-stable-tests/scripts/test-timing-lib.mjs",
+      "path": "vendor/lithe-testing/test-timing-lib.mjs",
+      "sha256": "6475279234c07cb8d420e03dbfc5e87aa64fd1703c872798684ee56cd2bc3425"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+name: Release preview
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify, test and package
+        env:
+          LITHE_CARGO_INTEGRATION: '1'
+        run: |
+          node scripts/verify-sdk.mjs
+          node --test test/*.test.mjs
+          node scripts/package.mjs --expect-tag "$GITHUB_REF_NAME"
+      - name: Publish immutable preview assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
+          macOS Cargo integration for a Lithe preview with API 3 buildSystems, buildProviders and serverProcess support.
+
+          Requires Cargo 1.70+ and Node.js 20.3+. Includes workspace/package build, check and test, clean, binary/example runs, Release, Features and Offline options.
+
+          Preview status: automated integration and contract checks pass; native installation and full UI acceptance are pending. Windows is not supported. Published ZIP bytes must not be replaced.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 --verify-tag --prerelease --title "Cargo $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
