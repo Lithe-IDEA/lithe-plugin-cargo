@@ -46,10 +46,10 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
   await writeFile(tool, `#!/bin/sh\nprintf '%s\\n' "$1" >> ${quote(calls)}\nexec ${quote(discovered.stdout.trim())} "$@"\n`, { mode: 0o755 });
   const configured = await build('build.invocationPlan', { root: '.', platform: 'macos', settings: { cargoPath: tool } });
-  assert.equal(configured.invocation.configuredExecutable, tool);
+  assert.equal(configured.invocation.executables[0].path, tool);
   const automatic = await build('build.invocationPlan', { root: '.', platform: 'macos', settings: { cargoPath: '' } });
-  assert.equal(automatic.invocation.configuredExecutable, undefined);
-  assert.deepEqual(automatic.invocation.executables, [{ kind: 'command', command: 'cargo' }]);
+  assert.equal(automatic.invocation.executables[0].path, null);
+  assert.deepEqual(automatic.invocation.executables, [{ kind: 'setting', settingID: 'cargoPath', path: null }, { kind: 'command', command: 'cargo' }]);
   const built = await buildPackage(join(scratch, 'packages'));
   const baseline = await snapshot(built.directory);
   const backend = spawn(process.execPath, [join(built.directory, 'backend/main.mjs')], {
@@ -62,7 +62,7 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   });
   const initialized = await host.initialize({ litheBuild: { versions: [1] } }, pathToFileURL(root).href + '/');
   assert.equal(initialized.result.capabilities.experimental.litheBuild.version, 1);
-  const modelPlan = await build('build.modelPlan', { root: '.', options: { offline: true }, tool: { executable: configured.invocation.configuredExecutable } });
+  const modelPlan = await build('build.modelPlan', { root: '.', options: { offline: true }, tool: { executable: configured.invocation.executables[0].path } });
   const loaded = await host.request(modelPlan.plan.provider.method, modelPlan.plan.provider.params);
   assert.equal(loaded.error, undefined, JSON.stringify(loaded.error));
   assert.deepEqual(loaded.result, { format: 'litheBuildModel', version: 1, ...JSON.parse(await readFile(join(here, 'fixtures/model.json'))) });
@@ -74,7 +74,7 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
   // separately hand-written Cargo command lines in this integration test.
   const cargo = async (command, request) => {
     const { plan } = await build(command, { root: '.', options, ...request });
-    return runProcess(configured.invocation.configuredExecutable, plan.arguments, {
+    return runProcess(configured.invocation.executables[0].path, plan.arguments, {
       cwd: join(root, plan.workingDirectory), env: { ...process.env, ...plan.environment, CARGO_TARGET_DIR: join(scratch, 'target') },
       signal: AbortSignal.timeout(20000), maxOutputBytes: 1024 * 1024
     });

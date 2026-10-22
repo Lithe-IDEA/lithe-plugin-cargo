@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "id": "io.github.lithe-idea.cargo-build",
   "displayName": "Cargo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "pluginAPIVersion": 3,
-  "requires": { "buildProviders": 1, "buildSystems": 2, "serverProcess": 1, "settings": 2 },
+  "requires": { "buildProviders": 1, "buildSystems": 1, "executableResolution": 1, "serverProcess": 1, "settings": 2 },
   "vendor": { "id": "io.github.lithe-idea", "displayName": "Lithe Community", "signatureRequirement": "none" },
   "permissions": ["languageServer.launch", "process.build"],
   "activationEvents": ["onBuildSystem:cargo"],
@@ -21,8 +21,10 @@
     "displayName": "Cargo",
     "detection": { "markers": ["Cargo.toml"], "nesting": "outermost" },
     "invocation": {
-      "executableSetting": "cargoPath",
-      "executables": [{ "kind": "command", "command": "cargo" }],
+      "executables": [
+        { "id": "selected", "kind": "setting", "settingID": "cargoPath" },
+        { "kind": "command", "command": "cargo" }
+      ],
       "globalArguments": ["--color", "never"],
       "version": { "arguments": ["--version"], "pattern": "cargo (\\d+\\.\\d+\\.\\d+)" },
       "minimumVersion": "1.70"
