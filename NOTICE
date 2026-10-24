@@ -7,3 +7,9 @@ and SHA-256 hashes are recorded in sdk.lock.json. The SDK is copied into
 the plugin at build time; test support is never shipped in the package.
 
 Cargo, Rust and Node.js are user-provided tools and are not redistributed.
+
+The icon in io.github.lithe-idea.cargo-build/icons/ comes from the JetBrains
+IntelliJ Platform Community repository, licensed under the Apache License,
+Version 2.0, at revision 7a8451c94dca0baee87b81976a42f39dd66480f7:
+
+  cargo.svg   platform/icons/src/language/rust.svg
