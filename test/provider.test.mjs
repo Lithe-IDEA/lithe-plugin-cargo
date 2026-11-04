@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
+import { createBackend, PluginError as SDKPluginError } from '../vendor/lithe-plugin-sdk/src/index.mjs';
+import { TestHost } from '../vendor/lithe-plugin-sdk/test/harness.mjs';
 import { modelFromMetadata, registerCargoProvider } from '../io.github.lithe-idea.cargo-build/backend/provider.mjs';
 
 async function fixture(t) {
@@ -27,12 +29,12 @@ async function fixture(t) {
 }
 
 class PluginError extends Error { constructor(code, message) { super(message); this.code = code; } }
-async function provider(root, run) {
+async function provider(root, run, log = () => {}) {
   const handlers = {};
   const backend = { onInitialize: (fn) => { handlers.initialize = fn; }, build: { model: (fn) => { handlers.model = fn; } } };
   registerCargoProvider(backend, PluginError);
   await handlers.initialize({ params: { rootUri: pathToFileURL(root).href + '/' } });
-  return (params) => handlers.model(params, { run, throwIfCancelled() {}, log() {} });
+  return (params) => handlers.model(params, { run, throwIfCancelled() {}, log });
 }
 
 test('Cargo membership and same-name target kinds survive deterministic model conversion', { timeout: 5000 }, async (t) => {
@@ -102,4 +104,48 @@ test('failed tools, malformed output and cancellation keep distinct outcomes', {
     async run() { aborted = true; throw cancelled; },
     log() { assert.fail('Cancellation must not be logged as a tool failure'); }
   }), (error) => error === cancelled);
+});
+
+
+test('metadata failures leave one safe SDK error boundary without copying output into logs', { timeout: 5000 }, async (t) => {
+  const { root } = await fixture(t);
+  const logs = [];
+  const privateOutput = 'private workspace source and environment output';
+  const failed = await provider(root, async () => ({ exitCode: 7, stderr: privateOutput }), (...args) => logs.push(args));
+  await assert.rejects(failed({ root: '.' }), (error) => {
+    assert.equal(error.code, 'cargo.metadataFailed');
+    assert.ok(!error.message.includes(privateOutput));
+    assert.match(error.message, /7/);
+    return true;
+  });
+  const missing = await provider(root, async () => { throw new Error(privateOutput); }, (...args) => logs.push(args));
+  await assert.rejects(missing({ root: '.' }), { code: 'cargo.unavailable' });
+  const invalid = await provider(root, async () => ({ exitCode: 0, stdout: privateOutput }), (...args) => logs.push(args));
+  await assert.rejects(invalid({ root: '.' }), (error) => {
+    assert.equal(error.code, 'cargo.invalidMetadata');
+    assert.ok(!error.message.includes(privateOutput));
+    return true;
+  });
+  assert.deepEqual(logs, [], 'the SDK owns the failure record; the provider must not log and rethrow');
+});
+
+
+test('the real SDK sends typed metadata failures without raw stderr or duplicate diagnostics', { timeout: 5000 }, async (t) => {
+  const { root } = await fixture(t);
+  const backend = createBackend({ name: 'cargo-build' });
+  registerCargoProvider(backend, SDKPluginError);
+  const host = new TestHost(backend);
+  t.after(() => host.close());
+  const initialized = await host.initialize({ litheBuild: { versions: [1] }, litheLogging: { versions: [1] } }, pathToFileURL(root).href);
+  assert.equal(initialized.result.capabilities.experimental.litheLogging.version, 1);
+  const response = await host.request('lithe/build/model', { root: '.', tool: { executable: join(root, 'missing-private-tool') } });
+  assert.equal(response.error.data.code, 'cargo.unavailable');
+  const facts = host.messages.filter((message) => message.method === 'lithe/log' && message.params.operation === 'lithe/build/model');
+  assert.equal(facts.length, 1);
+  assert.equal(facts[0].params.kind, 'operationFailed');
+  assert.equal(facts[0].params.code, 'cargo.unavailable');
+  assert.ok(Number.isSafeInteger(facts[0].params.durationMs) && facts[0].params.durationMs >= 0);
+  assert.ok(!JSON.stringify(facts).includes(root));
+  assert.deepEqual(Object.keys(facts[0].params).sort(), ['code', 'durationMs', 'kind', 'operation', 'operationId']);
+  assert.equal(facts[0].params.operationId, '2');
 });

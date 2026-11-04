@@ -62,7 +62,7 @@ export function registerCargoProvider(backend, PluginError) {
       directory = await realpath(resolve(workspaceRoot, root));
       if (!inside(workspaceRoot, directory)) throw new Error('The Cargo build root leaves the workspace through a symbolic link.');
     } catch (error) {
-      throw new PluginError('cargo.invalidRoot', error.message);
+      throw new PluginError('cargo.invalidRoot', 'The Cargo build root could not be read inside the open workspace. Check the workspace directory and symbolic links.');
     }
     const executable = tool?.executable ?? 'cargo';
     if (tool && (typeof executable !== 'string' || !isAbsolute(executable))) {
@@ -77,13 +77,13 @@ export function registerCargoProvider(backend, PluginError) {
       result = await context.run(executable, args, { cwd: directory, env: processEnvironment, maxOutputBytes: 8 * 1024 * 1024 });
     } catch (error) {
       context.throwIfCancelled();
-      context.log(error);
       throw new PluginError('cargo.unavailable', 'Cargo could not be started. Install Rust/Cargo and check the build tool path.');
     }
     context.throwIfCancelled();
     if (result.exitCode !== 0) {
-      context.log(result.stderr);
-      throw new PluginError('cargo.metadataFailed', `Cargo could not load this workspace. Check Cargo.toml and the Offline option. ${result.stderr.trim().slice(0, 2048)}`);
+      // The SDK records this failure once. Cargo output can contain project
+      // contents and environment values, so only the exit status crosses it.
+      throw new PluginError('cargo.metadataFailed', `Cargo could not load this workspace (exit status ${result.exitCode}). Check Cargo.toml and the Offline option.`);
     }
     try {
       const model = await modelFromMetadata(JSON.parse(result.stdout), directory);
@@ -91,8 +91,7 @@ export function registerCargoProvider(backend, PluginError) {
       return model;
     } catch (error) {
       context.throwIfCancelled();
-      context.log(error);
-      throw new PluginError('cargo.invalidMetadata', error.message);
+      throw new PluginError('cargo.invalidMetadata', 'Cargo returned an invalid workspace model. Check Cargo.toml and that every workspace member is inside the build root.');
     }
   });
 }
