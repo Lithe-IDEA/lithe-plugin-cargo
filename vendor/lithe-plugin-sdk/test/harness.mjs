@@ -58,7 +58,7 @@ export class TestHost {
     const response = await this.request('initialize', {
       processId: null,
       rootUri,
-      capabilities: { experimental },
+      capabilities: { experimental: { litheLogging: { versions: [1] }, ...experimental } },
     });
     this.notify('initialized', {});
     return response;

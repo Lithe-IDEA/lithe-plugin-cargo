@@ -58,6 +58,25 @@ Cargo enforces toolchain and required-feature rules. Open the workspace root;
 members or target sources outside the selected build root are refused. The host's
 `outermost` detection does not list independent nested workspaces separately.
 
+## Diagnostic logs
+
+This branch requires a host offering `litheLogging: 1`. The vendored official
+Node SDK sends typed `lithe/log` notifications to the host's v2 catalog and
+writer, in the current session's
+`plugins/io.github.lithe-idea.cargo-build/host` channel. The SDK records one
+INFO terminal on a successful metadata request and one ERROR on a failed
+request, with monotonic duration and a controlled failure code. Cancellation
+does not become an error. The provider does not log and throw the same failure
+twice, and does not copy metadata JSON, Cargo stderr, source, environment values
+or raw exceptions into logs.
+
+Build, check, test and run process outcomes use the host's `run` channel;
+their output stays in Build Output. Use Lithe's log window and diagnostic
+export for host evidence. No plugin writer, log directory or idle task is
+added. The SDK source base revision and local logging changes are identified
+by `sdk.lock.json`, including exact file hashes; they do not claim a released
+SDK artifact. Windows still uses v1 logging; no Windows v2 acceptance is claimed.
+
 ## Develop and verify
 
 Requires Node 20.3+, `zip`, and Cargo for integration tests. Unit tests and
@@ -69,26 +88,16 @@ node scripts/test.mjs
 node scripts/package.mjs
 ```
 
-Full integration also compiles a test-only bridge to Lithe's public
-`execute_json` API. CI checks out the exact host repository/revision from
-`sdk.lock.json` into `.artifacts/lithe-core`; it never follows a moving branch.
-For the same local procedure, clone the pinned host once (network required):
+Full integration compiles a test-only bridge to Lithe's public `execute_json`
+API. CI uses the host repository and `preview` ref in `sdk.lock.json.coreSource`,
+then records the exact resolved commit and source digest. The companion host
+logging change must land first. See **Core integration source** below for
+verified local working-tree preparation and the complete command.
 
-```sh
-gh repo clone 1lck/Lithe-IDEA .artifacts/lithe-core -- --filter=blob:none --no-checkout
-git -C .artifacts/lithe-core sparse-checkout set rust shared
-git -C .artifacts/lithe-core checkout --detach "$(node -p 'require("./sdk.lock.json").source.revision')"
-node scripts/prepare-core.mjs
-LITHE_CARGO_INTEGRATION=1 node scripts/test.mjs
-```
-
-Cargo downloads the host's locked Rust dependencies on the first build; only
-the tiny Cargo fixture runs offline. Preparation rejects a different revision,
-origin or tracked modifications, builds with `--locked`, and records bridge
-and binary hashes. `.artifacts/core-target` is private mutable build state for
-this checkout; it is not a shared worktree cache and never enters the plugin ZIP.
-The copied example in the disposable host checkout contains only the public API
-call; Cargo-specific assertions, manifests and golden models remain here.
+Cargo downloads the host's locked Rust dependencies on the first build;
+the Cargo fixture itself runs offline. `.artifacts/core-target` contains only
+private test build state and never enters the plugin ZIP. The harness links
+the public Core library without copying files into the source checkout.
 
 The three Core compatibility tests cover install review and capability refusal,
 outermost workspace detection/model decoding, and task/test argument selection.
@@ -104,14 +113,13 @@ is `dist/io.github.lithe-idea.cargo-build/`. The archive serves both Apple Silic
 and Intel Macs. CI builds on Linux to conserve native runner usage; the local
 integration suite was also run on macOS.
 
-The zero-dependency Node SDK and test helpers are vendored at the exact source
-revision in `sdk.lock.json`. Packaging refuses changed/unpinned vendor files and
-symbolic links. To update the SDK, copy the upstream files and deliberately
-update the source revision and every SHA-256; do not download anything at runtime.
-The main Lithe repository retains generic plugin contract tests. This repository
-owns Cargo-specific compatibility tests and uses the same host pin as the SDK;
-updating that pin deliberately tests a new supported host baseline. A fixed
-baseline does not by itself detect regressions on future Lithe preview commits.
+The zero-dependency Node SDK comes from `Lithe-IDEA/lithe-plugin-docs` at the
+base revision and local structured logging changes recorded in `sdkSource`.
+Historical test helpers retain their original source identity. Every vendor
+file has an exact SHA-256; packaging refuses changed or unpinned inputs and
+symbolic links. The separate `coreSource` chooses the integration host preview,
+so SDK provenance is never confused with the host's current source identity.
+No SDK or runtime is downloaded when the installed plugin starts.
 
 ## Runtime and build ownership
 
@@ -123,7 +131,7 @@ the package's complete file listing and SHA-256 hashes before and after use.
 
 Cargo's user cache, Cargo.lock and target directory remain owned by Cargo and
 the user's project configuration. This plugin creates no extra runtime cache.
-`dist/`, packaging staging, the pinned host checkout, Core compilation and
+`dist/`, packaging staging, the selected host checkout, Core compilation and
 `.artifacts/` test reports belong to one checkout
 and must not be copied as shared build caches. Packaging removes its own staging
 on success/failure; developers own final artifact cleanup. No installation step
@@ -145,3 +153,29 @@ candidates. Published 0.1.0/0.1.1 preview archives remain immutable. A compatibl
 host must advertise `executableResolution: 1`; the setting is a candidate ahead
 of automatic PATH discovery, with empty values skipped and explicit failures
 reported by the host. Maven/Gradle-style automatic candidates need no path setting.
+
+## Core integration source
+
+CI and release verification explicitly check out `sdk.lock.json.coreSource.ref`
+(`preview`) from the verified host repository. **Merge the companion host
+structured logging change into preview before this plugin change**; preparation
+rejects a host missing the typed operation catalog rather than attempting an
+old-protocol fallback. It records the resolved commit and exact source SHA-256;
+this moving test ref is not presented as a pinned release artifact. SDK vendor
+hashes and the historical test-support source remain independently pinned.
+
+Local validation can select a particular real host checkout and revision:
+
+```sh
+node scripts/prepare-core.mjs --source /path/to/Lithe-IDEA --ref HEAD --working-tree --target-dir /path/to/Lithe-IDEA/rust/target
+LITHE_CARGO_INTEGRATION=1 node scripts/test.mjs
+```
+
+`--working-tree` is a deliberate opt-in for local unpublished host changes;
+without it, dirty sources are rejected. The origin must still match the host
+repository and HEAD must resolve to the selected ref. The source remains
+unchanged: a test-only Rust executable links the built Core library in the
+plugin's private `.artifacts/core-target/`. Preparation records tracked and
+untracked `rust/` and `shared/` bytes, the harness and executable hashes;
+tests reject any drift after preparation. A caller may reuse an existing
+Cargo target with `--target-dir`, but never shares plugin state or log files.

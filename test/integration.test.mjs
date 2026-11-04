@@ -60,7 +60,7 @@ test('packaged provider loads a real Cargo workspace; build/test/run/clean leave
     try { await host.close(); }
     finally { if (backend.exitCode === null) await terminateProcessTree(backend); }
   });
-  const initialized = await host.initialize({ litheBuild: { versions: [1] } }, pathToFileURL(root).href + '/');
+  const initialized = await host.initialize({ litheBuild: { versions: [1] }, litheLogging: { versions: [1] } }, pathToFileURL(root).href + '/');
   assert.equal(initialized.result.capabilities.experimental.litheBuild.version, 1);
   const modelPlan = await build('build.modelPlan', { root: '.', options: { offline: true }, tool: { executable: configured.invocation.executables[0].path } });
   const loaded = await host.request(modelPlan.plan.provider.method, modelPlan.plan.provider.params);
