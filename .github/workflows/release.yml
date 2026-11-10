@@ -69,11 +69,14 @@ jobs:
           cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
           macOS Cargo integration for a Lithe preview with API 3 buildSystems 1, executableResolution 1, settings 2, buildProviders 1, serverProcess 1 and structured plugin diagnostics (litheLogging 1). Stable Lithe 0.6.7 does not offer litheLogging 1 and cannot start this version; keep using 0.1.1 there.
 
-          Changes in 0.1.2:
+          Changes in 0.1.3:
+          - Fixes the PATH given to Cargo on Windows-style hosts: the selected Cargo's directory is now joined with the platform path delimiter instead of a hard-coded colon.
+
+          Changes in 0.1.2 (still included):
           - Structured diagnostics: the bundled Node SDK records one INFO for each successful metadata request and one ERROR for each failure on the plugins/io.github.lithe-idea.cargo-build/host channel of Lithe's log window, with duration and a stable failure code. Cargo output, metadata JSON, source and environment values never enter the log. The duplicate raw stderr and JSON error logging is removed.
           - The Cargo path setting becomes the first of the host's ordered executable candidates (executableResolution 1), ahead of PATH discovery. A missing, non-executable or too-old selection still fails instead of falling back.
 
-          Requires Cargo 1.70+ and Node.js 20.3+. Not listed in Lithe Store yet; download the ZIP and install it from disk.
+          Requires Cargo 1.70+ and Node.js 20.3+. Listed in Lithe Store by a reviewed index pull request; the ZIP can also be installed from disk.
 
           Preview status: automated integration and contract checks pass; native installation and full UI acceptance are pending. Windows is not supported. Published ZIP bytes must not be replaced.
           NOTES
