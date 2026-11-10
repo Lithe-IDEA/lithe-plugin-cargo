@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { createBackend, PluginError as SDKPluginError } from '../vendor/lithe-plugin-sdk/src/index.mjs';
@@ -57,7 +57,7 @@ test('initialization is passive; metadata uses the host tool and only supported 
   assert.equal(calls[0][0], '/fake-tools/cargo');
   assert.deepEqual(calls[0][1], ['metadata', '--format-version', '1', '--no-deps', '--manifest-path', join(root, 'Cargo.toml'), '--offline']);
   assert.equal(calls[0][2].cwd, root);
-  assert.ok(calls[0][2].env.PATH.startsWith('/fake-tools:'));
+  assert.ok(calls[0][2].env.PATH.startsWith(`/fake-tools${delimiter}`));
 });
 
 test('relative and symlink build-root escapes are refused before Cargo starts', { timeout: 5000 }, async (t) => {
